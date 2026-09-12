@@ -33,9 +33,9 @@ float distLF = MAX_TOF_DIST, distRF = MAX_TOF_DIST;
 float distL45 = MAX_TOF_DIST, distR45 = MAX_TOF_DIST;
 
 // ================= Odometry Variables =================
-float ltm_s = 7.52; float ltm_f[3] = {7.52, 7.52, 7.52};
-float rtm_s = 7.52; float rtm_f[3] = {7.52, 7.52, 7.52};
-float tpd_s = 3.36; float tpd_f[3] = {3.36, 3.36, 3.36};
+float ltm_s = 7.66; float ltm_f[3] = {7.66, 7.52, 7.52};
+float rtm_s = 7.66; float rtm_f[3] = {7.66, 7.52, 7.52};
+float tpd_s = 4.17; float tpd_f[3] = {4.17, 3.36, 3.36};
 volatile long leftTicks = 0;
 volatile long rightTicks = 0;
 float lastCmdDist = 0, lastCmdAngle = 0;
@@ -44,7 +44,7 @@ float lastCmdDist = 0, lastCmdAngle = 0;
 float Ki = 0.0;   
 float EMA_ALPHA = 1.0; 
 float SIDE_WALL_THRESHOLD = 155.0;     
-float FRONT_WALL_THRESHOLD = 160.0;
+float FRONT_WALL_THRESHOLD = 165.0;
 float TARGET_45_DIST = 126.0;        
 float FRONT_SLOW_DIST = 80.0, FRONT_CRASH_DIST = 45.0; 
 float PID_DEADBAND = 2.0;  
@@ -53,7 +53,7 @@ float REVERSE_BRAKE_MS = 25.0;
 // ================= Phase & Speed Profiles =================
 // [0] = Search Phase
 float Kp_s = 0.25, Kd_s = 0.02, cs_s = 180.0, tm_s = 1.0, ec_s = 47.5;
-float o9i_s = 58.0, o9o_s = 120.0, o18i_s = 50.0, o18o_s = 110.0;
+float o9i_s = 50.0, o9o_s = 100.0, o18i_s = 50.0, o18o_s = 110.0;
 
 // [0] = Fast 120, [1] = Fast 180, [2] = Fast 220
 float Kp_f[3] =   {0.25, 0.2, 0.2};
