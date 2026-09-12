@@ -267,7 +267,7 @@ void waitForMove() {
 // Adjust robot position so front wall is exactly at TURN_WALL_DIST before turning
 void adjust_for_turn() {
   float frontDist = min(distLF, distRF);
-  if (frontDist >= 2000.0) return;  // no front wall detected
+  if (frontDist > 250.0) return;  // if wall is too far, it's not in our cell, ignore
   float delta = frontDist - TURN_WALL_DIST;
   if (abs(delta) < 3.0) return;  // within 3mm tolerance
   driveDir = (delta > 0) ? 1 : -1;
