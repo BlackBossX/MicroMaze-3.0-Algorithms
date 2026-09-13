@@ -46,10 +46,12 @@ float EMA_ALPHA = 1.0;
 float SIDE_WALL_THRESHOLD = 155.0;     
 float FRONT_WALL_THRESHOLD = 165.0;
 float TARGET_45_DIST = 126.0;        
-float TURN_WALL_DIST = 126.0;
+float TURN_WALL_DIST = 80.0;
 float FRONT_SLOW_DIST = 80.0, FRONT_CRASH_DIST = 45.0; 
 float PID_DEADBAND = 2.0;  
 float REVERSE_BRAKE_MS = 25.0; 
+float PIVOT_GAIN = 1.2;
+float TURN_PIVOT_GAIN = 1.0;
 
 // ================= Phase & Speed Profiles =================
 // [0] = Search Phase
@@ -310,6 +312,31 @@ void r_move(float dist, bool usePID) {
   waitForMove();
 }
 
+// Square up the robot using front walls or side walls before turning
+void align_robot() {
+  vTaskDelay(pdMS_TO_TICKS(50)); // let sensors settle after stopping
+  for (int i = 0; i < 2; i++) {
+    float frontDist = min(distLF, distRF);
+    if (frontDist <= 250.0) {
+      float error = distLF - distRF;
+      if (abs(error) <= 3.0) break;
+      float correction = error * PIVOT_GAIN;
+      correction = constrain(correction, -15.0, 15.0);
+      r_turn(-correction);
+      vTaskDelay(pdMS_TO_TICKS(50));
+    } else if (distL45 < SIDE_WALL_THRESHOLD && distR45 < SIDE_WALL_THRESHOLD) {
+      float error = distL45 - distR45;
+      if (abs(error) <= 3.0) break;
+      float correction = error * TURN_PIVOT_GAIN;
+      correction = constrain(correction, -15.0, 15.0);
+      r_turn(-correction);
+      vTaskDelay(pdMS_TO_TICKS(50));
+    } else {
+      break;
+    }
+  }
+}
+
 // ================= Flood Fill & Logic =================
 bool is_center_pos(int cx, int cy) {
   return ((cx == 7 && cy == 7) || (cx == 7 && cy == 8) || (cx == 8 && cy == 7) || (cx == 8 && cy == 8));
@@ -427,6 +454,7 @@ void move_to_optimal_neighbor() {
 
     r_move(in_offset, false); 
     adjust_for_turn();
+    align_robot();
     if (turn == 1) { r_turn(90); }
     else if (turn == 2) { r_turn(90); r_turn(90); }
     else if (turn == 3) { r_turn(-90); }
@@ -495,6 +523,7 @@ void mazeTask(void * pvParameters) {
 
         r_move(in_offset, false); 
         adjust_for_turn();
+        align_robot();
         if (turn == 1) { r_turn(90); }
         else if (turn == 2) { r_turn(90); r_turn(90); }
         else if (turn == 3) { r_turn(-90); }
@@ -599,6 +628,8 @@ const char index_html[] PROGMEM = R"rawliteral(
     <div class="grid-4">
       <div><label>Ki:</label><input type="number" id="p_ki" step="0.01"></div>
       <div><label>Turn Wall Dist:</label><input type="number" id="p_twd"></div>
+      <div><label>Pivot Gain:</label><input type="number" id="p_pg" step="0.1"></div>
+      <div><label>Turn Pivot Gain:</label><input type="number" id="p_tpg" step="0.1"></div>
       <div><label>Target 45:</label><input type="number" id="p_t45"></div>
       <div><label>Side Wall Th:</label><input type="number" id="p_swt"></div>
       <div><label>Front Wall Th:</label><input type="number" id="p_fwt"></div>
@@ -654,14 +685,14 @@ const char index_html[] PROGMEM = R"rawliteral(
     function fetchParams() {
       fetch('/get_params').then(r => r.json()).then(d => {
         ['kps','kp0','kp1','kp2','kds','kd0','kd1','kd2','css','cs0','cs1','cs2','tms','tm0','tm1','tm2','o9is','o9i0','o9i1','o9i2','o9os','o9o0','o9o1','o9o2','o18is','o18i0','o18i1','o18i2','o18os','o18o0','o18o1','o18o2','ecs','ec0','ec1','ec2','ltms','ltm0','ltm1','ltm2','rtms','rtm0','rtm1','rtm2','tpds','tpd0','tpd1','tpd2'].forEach(k => { document.getElementById(k).value = d[k]; });
-        ['ki','twd','t45','swt','fwt','rb','fsd','db'].forEach(k => { document.getElementById('p_' + k).value = d[k]; });
+        ['ki','twd','pg','tpg','t45','swt','fwt','rb','fsd','db'].forEach(k => { document.getElementById('p_' + k).value = d[k]; });
         swt = d.swt; fwt = d.fwt; 
       });
     }
 
     function updateParams() {
       let ids = ['kps','kp0','kp1','kp2','kds','kd0','kd1','kd2','css','cs0','cs1','cs2','tms','tm0','tm1','tm2','o9is','o9i0','o9i1','o9i2','o9os','o9o0','o9o1','o9o2','o18is','o18i0','o18i1','o18i2','o18os','o18o0','o18o1','o18o2','ecs','ec0','ec1','ec2','ltms','ltm0','ltm1','ltm2','rtms','rtm0','rtm1','rtm2','tpds','tpd0','tpd1','tpd2'].map(k => `${k}=${document.getElementById(k).value}`);
-      let globals = ['ki','twd','t45','swt','fwt','rb','fsd','db'].map(k => `${k}=${document.getElementById('p_'+k).value}`);
+      let globals = ['ki','twd','pg','tpg','t45','swt','fwt','rb','fsd','db'].map(k => `${k}=${document.getElementById('p_'+k).value}`);
       fetch(`/set_params?${ids.join('&')}&${globals.join('&')}`).then(() => { alert("Saved!"); fetchParams(); });
     }
 
@@ -783,7 +814,7 @@ void setup() {
     json += "\"ltms\":" + String(ltm_s) + ",\"ltm0\":" + String(ltm_f[0]) + ",\"ltm1\":" + String(ltm_f[1]) + ",\"ltm2\":" + String(ltm_f[2]) + ",";
     json += "\"rtms\":" + String(rtm_s) + ",\"rtm0\":" + String(rtm_f[0]) + ",\"rtm1\":" + String(rtm_f[1]) + ",\"rtm2\":" + String(rtm_f[2]) + ",";
     json += "\"tpds\":" + String(tpd_s) + ",\"tpd0\":" + String(tpd_f[0]) + ",\"tpd1\":" + String(tpd_f[1]) + ",\"tpd2\":" + String(tpd_f[2]) + ",";
-    json += "\"ki\":" + String(Ki) + ",\"twd\":" + String(TURN_WALL_DIST) + ",";
+    json += "\"ki\":" + String(Ki) + ",\"twd\":" + String(TURN_WALL_DIST) + ",\"pg\":" + String(PIVOT_GAIN) + ",\"tpg\":" + String(TURN_PIVOT_GAIN) + ",";
     json += "\"t45\":" + String(TARGET_45_DIST) + ",\"swt\":" + String(SIDE_WALL_THRESHOLD) + ",\"fwt\":" + String(FRONT_WALL_THRESHOLD) + ",";
     json += "\"rb\":" + String(REVERSE_BRAKE_MS) + ",\"fsd\":" + String(FRONT_SLOW_DIST) + ",\"db\":" + String(PID_DEADBAND) + "}";
     server.send(200, "application/json", json);
@@ -852,6 +883,8 @@ void setup() {
 
     if (server.hasArg("ki")) Ki = server.arg("ki").toFloat();
     if (server.hasArg("twd")) TURN_WALL_DIST = server.arg("twd").toFloat();
+    if (server.hasArg("pg")) PIVOT_GAIN = server.arg("pg").toFloat();
+    if (server.hasArg("tpg")) TURN_PIVOT_GAIN = server.arg("tpg").toFloat();
     if (server.hasArg("t45")) TARGET_45_DIST = server.arg("t45").toFloat();
     if (server.hasArg("swt")) SIDE_WALL_THRESHOLD = server.arg("swt").toFloat();
     if (server.hasArg("fwt")) FRONT_WALL_THRESHOLD = server.arg("fwt").toFloat();
